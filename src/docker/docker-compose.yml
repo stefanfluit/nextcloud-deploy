@@ -83,8 +83,8 @@ services:
       - traefik.http.routers.nextcloud.middlewares=nextcloud,nextcloud_redirect
       - traefik.http.routers.nextcloud.tls.certresolver=${PROVIDER}
       - traefik.http.routers.nextcloud.rule=Host(`nextcloud.${DOMAIN}`)
-      - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}
-      - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.mydomain.net
+      - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW-FROM https://nextcloud.${DOMAIN}
+      - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
       - traefik.http.middlewares.nextcloud.headers.stsSeconds=155520011
       - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
       - traefik.http.middlewares.nextcloud.headers.stsPreload=true
