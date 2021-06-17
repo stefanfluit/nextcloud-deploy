@@ -1,5 +1,6 @@
 version: '3.8'
 # Minimal version Docker is 19.03.0+, https://docs.docker.com/compose/compose-file/.
+# docker network create nextcloud
 
 services:
   traefik:
@@ -11,7 +12,7 @@ services:
       - "--api=true"
       - "--api.dashboard=true"
       - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=true"
+      - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
@@ -24,16 +25,15 @@ services:
       - "--certificatesresolvers.${PROVIDER}.acme.storage=/letsencrypt/acme.json"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      - "traefik.http.routers.dashboard.rule=Host(`${HOSTNAME}-traefik.${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
       - "traefik.http.routers.dashboard.tls=true"
       - "traefik.http.routers.dashboard.tls.certResolver=${PROVIDER}"
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.middlewares=api-auth"
       # get md5 from htpasswd or http://www.htaccesstools.com/htpasswd-generator/
       # and then double all $ to $$ to avoid docker-compose
-      # test1234 for test
       - "traefik.http.middlewares.api-auth.basicauth.users=admin:$$2y$$10$$uWVUjh7i1g43e5xzBEzjYeJYpT4S9omilXI8UwD961AkYnHpvunqG"
-      - "traefik.http.middlewares.test-ipwhitelist.ipwhitelist.sourcerange=127.0.0.1/32, 217.63.222.64"
+      - "traefik.http.middlewares.test-ipwhitelist.ipwhitelist.sourcerange=127.0.0.1/32, 10.200.60.0/24, 10.200.65.0/24"
     ports:
       - "80:80"
       - "443:443"
@@ -51,7 +51,7 @@ services:
   db:
     restart: ${RESTART}
     container_name: postgres_nextcloud
-    image: postgres:13.3-alpine
+    image: postgres:13.3
     networks:
       - nextcloud
     environment:
@@ -59,20 +59,20 @@ services:
     - POSTGRES_PASSWORD
     - POSTGRES_DB
     volumes:
-    - nextcloud-db:/var/lib/postgresql/data
+    - /var/lib/postgresql/data:/var/lib/postgresql/data
 
   redis:
-    image: redis:6.2.4-alpine
+    image: redis:6.2.4
     container_name: redis_nextcloud
     restart: ${RESTART}
     networks:
       - nextcloud
     volumes:
-      - redis:/var/lib/redis
+      - /var/lib/redis:/var/lib/redis
 
   nextcloud:
     container_name: nextcloud_nextcloud
-    image: nextcloud:21.0.2-fpm-alpine
+    image: nextcloud:21.0.2-apache
     restart: ${RESTART}
     networks:
       - nextcloud
@@ -80,16 +80,17 @@ services:
       - redis
       - db
     labels:
-      - traefik.http.routers.nextcloud.middlewares=nextcloud,nextcloud_redirect
-      - traefik.http.routers.nextcloud.tls.certresolver=${PROVIDER}
-      - traefik.http.routers.nextcloud.rule=Host(`nextcloud.${DOMAIN}`)
-      - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW-FROM https://nextcloud.${DOMAIN}
-      - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
-      - traefik.http.middlewares.nextcloud.headers.stsSeconds=155520011
-      - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
-      - traefik.http.middlewares.nextcloud.headers.stsPreload=true
-      - traefik.http.middlewares.nextcloud_redirect.redirectregex.regex=/.well-known/(card|cal)dav
-      - traefik.http.middlewares.nextcloud_redirect.redirectregex.replacement=/remote.php/dav/
+      - "traefik.enable=true"
+      - "traefik.http.routers.nextcloud.middlewares=nextcloud,nextcloud_redirect"
+      - "traefik.http.routers.nextcloud.tls.certresolver=${PROVIDER}"
+      - "traefik.http.routers.nextcloud.rule=Host(`${HOSTNAME}.${DOMAIN}`)"
+      - "traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW-FROM https://${HOSTNAME}.${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${HOSTNAME}.${DOMAIN} *.${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud.headers.stsSeconds=155520011"
+      - "traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.nextcloud.headers.stsPreload=true"
+      - "traefik.http.middlewares.nextcloud_redirect.redirectregex.regex=/.well-known/(card|cal)dav"
+      - "traefik.http.middlewares.nextcloud_redirect.redirectregex.replacement=/remote.php/dav/"
     environment:
       - POSTGRES_DB
       - POSTGRES_USER
@@ -100,19 +101,14 @@ services:
       - REDIS_HOST
       - NEXTCLOUD_TRUSTED_DOMAINS
       - TRUSTED_PROXIES
+      - OVERWRITEPROTOCOL
     volumes:
-      - nextcloud-www:/var/www/html
+      - /var/www/html:/var/www/html
 
 networks:
   nextcloud:
     external: true
 
 volumes:
-    nextcloud-www:
-      driver: local
-    nextcloud-db:
-      driver: local
-    redis:
-      driver: local
     letsencrypt:
       driver: local
