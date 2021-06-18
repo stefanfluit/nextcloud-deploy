@@ -30,10 +30,17 @@ services:
       - "traefik.http.routers.dashboard.tls.certResolver=${PROVIDER}"
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.middlewares=api-auth"
+      - "traefik.http.routers.dashboard.middlewares=ip-whitelist"
+      # Prometheus
+      - "traefik.http.routers.prometheus.rule=Host(`${HOSTNAME}-prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.certResolver=${PROVIDER}"
+      - "traefik.http.routers.prometheus.service=prometheus@internal"
+      - "traefik.http.routers.prometheus.middlewares=ip-whitelist"
       # get md5 from htpasswd or http://www.htaccesstools.com/htpasswd-generator/
       # and then double all $ to $$ to avoid docker-compose
       - "traefik.http.middlewares.api-auth.basicauth.users=admin:$$2y$$10$$uWVUjh7i1g43e5xzBEzjYeJYpT4S9omilXI8UwD961AkYnHpvunqG"
-      - "traefik.http.middlewares.test-ipwhitelist.ipwhitelist.sourcerange=127.0.0.1/32, 10.200.60.0/24, 10.200.65.0/24"
+      - "traefik.http.middlewares.ip-whitelist.ipwhitelist.sourcerange=127.0.0.1/32, 217.63.222.64/32"
     ports:
       - "80:80"
       - "443:443"
